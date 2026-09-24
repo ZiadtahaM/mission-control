@@ -1,0 +1,87 @@
+.control-room-root {
+  --background: 240 20% 5%;
+  --foreground: 0 0% 100%;
+  --card: 240 20% 7%;
+  --card-foreground: 0 0% 100%;
+  --popover: 240 20% 7%;
+  --popover-foreground: 0 0% 100%;
+  --primary: 190 100% 50%; /* Cyan */
+  --primary-foreground: 240 20% 5%;
+  --secondary: 240 20% 12%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 240 20% 15%;
+  --muted-foreground: 240 5% 65%;
+  --accent: 210 100% 50%; /* Blue */
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 240 20% 15%;
+  --input: 240 20% 15%;
+  --ring: 190 100% 50%;
+  --radius: 0.25rem;
+  
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: 'Inter', sans-serif;
+}
+
+.control-room-root .font-mono {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+.control-room-root .panel {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+}
+
+.control-room-root .glow-text {
+  text-shadow: 0 0 10px hsla(var(--primary), 0.5);
+}
+
+.control-room-root .glow-border:hover {
+  box-shadow: 0 0 0 1px hsl(var(--primary));
+  border-color: hsl(var(--primary));
+}
+
+/* Sidebar hover expansion */
+.cr-sidebar-container {
+  display: flex;
+  height: 100%;
+}
+
+.cr-sidebar-primary {
+  width: 48px;
+  background: hsl(var(--background));
+  border-right: 1px solid hsl(var(--border));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 1rem;
+  z-index: 20;
+}
+
+.cr-sidebar-secondary {
+  width: 0;
+  overflow: hidden;
+  background: hsl(var(--card));
+  border-right: 1px solid transparent;
+  transition: width 0.2s ease, border-color 0.2s ease;
+  white-space: nowrap;
+  z-index: 10;
+}
+
+.cr-sidebar-container:hover .cr-sidebar-secondary {
+  width: 200px;
+  border-right-color: hsl(var(--border));
+}
+
+.cr-chart-container .recharts-cartesian-grid-horizontal line,
+.cr-chart-container .recharts-cartesian-grid-vertical line {
+  stroke: hsl(var(--border));
+}
+
+.cr-chart-container .recharts-tooltip-cursor {
+  fill: hsl(var(--muted));
+  opacity: 0.2;
+}

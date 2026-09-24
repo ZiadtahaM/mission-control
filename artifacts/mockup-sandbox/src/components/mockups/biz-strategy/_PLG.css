@@ -1,0 +1,44 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Inter:wght@400;500;600&display=swap');
+
+.indie-dashboard-wrapper {
+  background-color: #fafaf8;
+  color: #1c1917;
+  font-family: 'Inter', sans-serif;
+  min-height: 100vh;
+}
+
+.font-playfair {
+  font-family: 'Playfair Display', serif;
+}
+
+.bg-coral-50 {
+  background-color: #fff7ed;
+}
+.text-coral-500 {
+  color: #f97316;
+}
+.bg-coral-500 {
+  background-color: #f97316;
+}
+.border-coral-200 {
+  border-color: #fed7aa;
+}
+
+.hover\:border-coral-300:hover {
+  border-color: #fdba74;
+}
+
+.confetti-dot {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  animation: float-up 3s ease-in-out infinite;
+}
+
+@keyframes float-up {
+  0% { transform: translateY(0) scale(1); opacity: 0; }
+  20% { opacity: 1; }
+  80% { opacity: 1; transform: translateY(-30px) scale(1.2); }
+  100% { transform: translateY(-40px) scale(0); opacity: 0; }
+}

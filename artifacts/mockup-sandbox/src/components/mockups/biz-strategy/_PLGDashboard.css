@@ -1,0 +1,59 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+.plg-dashboard {
+  --plg-bg: #0d1117;
+  --plg-card-bg: #161b22;
+  --plg-accent: #00d084;
+  --plg-accent-dim: rgba(0, 208, 132, 0.1);
+  --plg-border: rgba(255, 255, 255, 0.08);
+  --plg-text-primary: #f0f6fc;
+  --plg-text-secondary: #8b949e;
+  
+  font-family: 'Inter', sans-serif;
+  background-color: var(--plg-bg);
+  color: var(--plg-text-primary);
+}
+
+.plg-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.plg-card {
+  background-color: var(--plg-card-bg);
+  border: 1px solid var(--plg-border);
+  border-radius: 8px;
+}
+
+.plg-btn-primary {
+  background-color: var(--plg-accent);
+  color: #000;
+  font-weight: 600;
+  border-radius: 6px;
+  transition: opacity 0.2s;
+}
+.plg-btn-primary:hover {
+  opacity: 0.9;
+}
+
+.plg-btn-secondary {
+  background-color: transparent;
+  color: var(--plg-text-primary);
+  border: 1px solid var(--plg-border);
+  font-weight: 500;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+}
+.plg-btn-secondary:hover {
+  background-color: rgba(255,255,255,0.05);
+}
+
+.plg-input {
+  background-color: #010409;
+  border: 1px solid var(--plg-border);
+  color: var(--plg-text-primary);
+  border-radius: 6px;
+}
+.plg-input:focus {
+  outline: none;
+  border-color: var(--plg-accent);
+}

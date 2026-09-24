@@ -1,0 +1,1105 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: SaaS Boilerplate API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: users
+    description: User management
+  - name: payments
+    description: Stripe payments and subscriptions
+  - name: dashboard
+    description: Admin dashboard KPIs and analytics
+  - name: admin
+    description: Admin user management
+  - name: algorithms
+    description: Algorithm data and metadata
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  # AUTH
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterBody"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "409":
+          description: Email already in use
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginBody"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/refresh:
+    post:
+      operationId: refreshToken
+      tags: [auth]
+      summary: Refresh access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenBody"
+      responses:
+        "200":
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid or expired refresh token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout and revoke refresh token
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenBody"
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/forgot-password:
+    post:
+      operationId: forgotPassword
+      tags: [auth]
+      summary: Send password reset email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordBody"
+      responses:
+        "200":
+          description: Reset email sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/reset-password:
+    post:
+      operationId: resetPassword
+      tags: [auth]
+      summary: Reset password with token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordBody"
+      responses:
+        "200":
+          description: Password reset successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/verify-email:
+    post:
+      operationId: verifyEmail
+      tags: [auth]
+      summary: Verify email with token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyEmailBody"
+      responses:
+        "200":
+          description: Email verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/2fa/setup:
+    post:
+      operationId: setup2fa
+      tags: [auth]
+      summary: Generate 2FA QR code
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 2FA setup data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TwoFactorSetupResponse"
+
+  /auth/2fa/verify:
+    post:
+      operationId: verify2fa
+      tags: [auth]
+      summary: Verify and enable 2FA
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TwoFactorVerifyBody"
+      responses:
+        "200":
+          description: 2FA enabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/2fa/disable:
+    post:
+      operationId: disable2fa
+      tags: [auth]
+      summary: Disable 2FA
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TwoFactorVerifyBody"
+      responses:
+        "200":
+          description: 2FA disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # USERS
+  /users/me:
+    get:
+      operationId: getMe
+      tags: [users]
+      summary: Get current user profile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+    patch:
+      operationId: updateMe
+      tags: [users]
+      summary: Update current user profile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileBody"
+      responses:
+        "200":
+          description: Updated user profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+    delete:
+      operationId: deleteMe
+      tags: [users]
+      summary: Soft delete current user (GDPR)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Account scheduled for deletion
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /users/change-password:
+    post:
+      operationId: changePassword
+      tags: [users]
+      summary: Change password
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordBody"
+      responses:
+        "200":
+          description: Password changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /users/sessions:
+    get:
+      operationId: getSessions
+      tags: [users]
+      summary: Get active sessions
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Active sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Session"
+
+  # PAYMENTS
+  /payments/checkout:
+    post:
+      operationId: createCheckoutSession
+      tags: [payments]
+      summary: Create Stripe checkout session
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckoutBody"
+      responses:
+        "200":
+          description: Checkout session URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutResponse"
+
+  /payments/portal:
+    get:
+      operationId: getPortalUrl
+      tags: [payments]
+      summary: Get Stripe customer portal URL
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Portal URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PortalResponse"
+
+  /payments/invoices:
+    get:
+      operationId: getInvoices
+      tags: [payments]
+      summary: Get invoice history
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: Invoice list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvoiceListResponse"
+
+  /payments/subscription:
+    get:
+      operationId: getSubscription
+      tags: [payments]
+      summary: Get current subscription
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Subscription details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subscription"
+
+  /payments/webhook:
+    post:
+      operationId: stripeWebhook
+      tags: [payments]
+      summary: Stripe webhook handler
+      responses:
+        "200":
+          description: Webhook handled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # DASHBOARD
+  /dashboard/kpis:
+    get:
+      operationId: getDashboardKpis
+      tags: [dashboard]
+      summary: Get dashboard KPI metrics
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: KPI metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardKpis"
+
+  /dashboard/analytics:
+    get:
+      operationId: getDashboardAnalytics
+      tags: [dashboard]
+      summary: Get 30-day revenue analytics
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Revenue time series
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TimeSeriesPoint"
+
+  /dashboard/signups:
+    get:
+      operationId: getDashboardSignups
+      tags: [dashboard]
+      summary: Get 7-day signup data
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Daily signups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TimeSeriesPoint"
+
+  /dashboard/plans:
+    get:
+      operationId: getDashboardPlans
+      tags: [dashboard]
+      summary: Get plan distribution
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Plan distribution
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanDistribution"
+
+  /dashboard/activity:
+    get:
+      operationId: getDashboardActivity
+      tags: [dashboard]
+      summary: Get recent activity feed
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Recent activity events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityEvent"
+
+  /dashboard/api-usage:
+    get:
+      operationId: getDashboardApiUsage
+      tags: [dashboard]
+      summary: Get API usage stats
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: API usage statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiUsageStats"
+
+  # ADMIN
+  /admin/users:
+    get:
+      operationId: getAdminUsers
+      tags: [admin]
+      summary: Get paginated user list (admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: plan
+          in: query
+          schema:
+            type: string
+        - name: role
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated user list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserListResponse"
+
+  /admin/users/{userId}/ban:
+    post:
+      operationId: banUser
+      tags: [admin]
+      summary: Ban a user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User banned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /admin/users/{userId}/unban:
+    post:
+      operationId: unbanUser
+      tags: [admin]
+      summary: Unban a user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User unbanned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /admin/users/{userId}/role:
+    patch:
+      operationId: changeUserRole
+      tags: [admin]
+      summary: Change user role
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeRoleBody"
+      responses:
+        "200":
+          description: Role changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        code:
+          type: string
+      required:
+        - message
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+
+    RegisterBody:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        name:
+          type: string
+      required:
+        - email
+        - password
+        - name
+
+    LoginBody:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        totpCode:
+          type: string
+      required:
+        - email
+        - password
+
+    RefreshTokenBody:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+      required:
+        - refreshToken
+
+    ForgotPasswordBody:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+      required:
+        - email
+
+    ResetPasswordBody:
+      type: object
+      properties:
+        token:
+          type: string
+        password:
+          type: string
+          minLength: 8
+      required:
+        - token
+        - password
+
+    VerifyEmailBody:
+      type: object
+      properties:
+        token:
+          type: string
+      required:
+        - token
+
+    TwoFactorSetupResponse:
+      type: object
+      properties:
+        secret:
+          type: string
+        qrCodeUrl:
+          type: string
+        backupCodes:
+          type: array
+          items:
+            type: string
+      required:
+        - secret
+        - qrCodeUrl
+        - backupCodes
+
+    TwoFactorVerifyBody:
+      type: object
+      properties:
+        totpCode:
+          type: string
+      required:
+        - totpCode
+
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        user:
+          $ref: "#/components/schemas/UserProfile"
+      required:
+        - accessToken
+        - refreshToken
+        - user
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [SUPER_ADMIN, ADMIN, USER]
+        plan:
+          type: string
+          enum: [FREE, PRO, ENTERPRISE]
+        emailVerified:
+          type: boolean
+        twoFactorEnabled:
+          type: boolean
+        avatarUrl:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        banned:
+          type: boolean
+      required:
+        - id
+        - email
+        - name
+        - role
+        - plan
+        - emailVerified
+        - twoFactorEnabled
+        - createdAt
+        - banned
+
+    UpdateProfileBody:
+      type: object
+      properties:
+        name:
+          type: string
+        avatarUrl:
+          type: string
+
+    ChangePasswordBody:
+      type: object
+      properties:
+        oldPassword:
+          type: string
+        newPassword:
+          type: string
+          minLength: 8
+      required:
+        - oldPassword
+        - newPassword
+
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+        ipAddress:
+          type: string
+          nullable: true
+        userAgent:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - createdAt
+        - expiresAt
+
+    CheckoutBody:
+      type: object
+      properties:
+        plan:
+          type: string
+          enum: [PRO, ENTERPRISE]
+      required:
+        - plan
+
+    CheckoutResponse:
+      type: object
+      properties:
+        url:
+          type: string
+      required:
+        - url
+
+    PortalResponse:
+      type: object
+      properties:
+        url:
+          type: string
+      required:
+        - url
+
+    Subscription:
+      type: object
+      properties:
+        id:
+          type: string
+        plan:
+          type: string
+          enum: [FREE, PRO, ENTERPRISE]
+        status:
+          type: string
+        currentPeriodStart:
+          type: string
+          format: date-time
+          nullable: true
+        currentPeriodEnd:
+          type: string
+          format: date-time
+          nullable: true
+        cancelAt:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - plan
+        - status
+
+    InvoiceListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Invoice"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required:
+        - data
+        - total
+        - page
+        - limit
+
+    Invoice:
+      type: object
+      properties:
+        id:
+          type: string
+        amount:
+          type: number
+        currency:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        pdfUrl:
+          type: string
+          nullable: true
+      required:
+        - id
+        - amount
+        - currency
+        - status
+        - createdAt
+
+    DashboardKpis:
+      type: object
+      properties:
+        totalUsers:
+          type: integer
+        totalUsersChange:
+          type: number
+        mrr:
+          type: number
+        mrrChange:
+          type: number
+        dau:
+          type: integer
+        dauChange:
+          type: number
+        apiCallsThisMonth:
+          type: integer
+        apiCallsLimit:
+          type: integer
+        churnRate:
+          type: number
+        arpu:
+          type: number
+      required:
+        - totalUsers
+        - totalUsersChange
+        - mrr
+        - mrrChange
+        - dau
+        - dauChange
+        - apiCallsThisMonth
+        - apiCallsLimit
+        - churnRate
+        - arpu
+
+    TimeSeriesPoint:
+      type: object
+      properties:
+        date:
+          type: string
+        value:
+          type: number
+      required:
+        - date
+        - value
+
+    PlanDistribution:
+      type: object
+      properties:
+        free:
+          type: integer
+        pro:
+          type: integer
+        enterprise:
+          type: integer
+      required:
+        - free
+        - pro
+        - enterprise
+
+    ActivityEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        action:
+          type: string
+        userId:
+          type: string
+        userName:
+          type: string
+        userEmail:
+          type: string
+        resourceType:
+          type: string
+          nullable: true
+        ipAddress:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - action
+        - userId
+        - userName
+        - userEmail
+        - createdAt
+
+    ApiUsageStats:
+      type: object
+      properties:
+        totalCalls:
+          type: integer
+        successRate:
+          type: number
+        p50Latency:
+          type: number
+        p95Latency:
+          type: number
+        p99Latency:
+          type: number
+        errorRate:
+          type: number
+        topEndpoints:
+          type: array
+          items:
+            $ref: "#/components/schemas/EndpointStat"
+      required:
+        - totalCalls
+        - successRate
+        - p50Latency
+        - p95Latency
+        - p99Latency
+        - errorRate
+        - topEndpoints
+
+    EndpointStat:
+      type: object
+      properties:
+        endpoint:
+          type: string
+        calls:
+          type: integer
+        avgLatency:
+          type: number
+      required:
+        - endpoint
+        - calls
+        - avgLatency
+
+    AdminUserListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserProfile"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required:
+        - data
+        - total
+        - page
+        - limit
+
+    ChangeRoleBody:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [SUPER_ADMIN, ADMIN, USER]
+      required:
+        - role

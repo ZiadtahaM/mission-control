@@ -1,0 +1,84 @@
+{
+  "task": "CRITICAL FIXES — LaunchKit SaaS Boilerplate",
+  "instruction": "You built LaunchKit. Now fix all 8 critical production issues listed below. Fix them ALL in one pass. Do not stop until every fix is verified working. Do not break existing UI or routes.",
+  "fixes": [
+    {
+      "id": 1,
+      "priority": "CRITICAL",
+      "title": "Fix Stripe Webhook — Raw Body Parser",
+      "problem": "Stripe webhook signature verification FAILS if Express parses JSON body first. Right now every webhook event returns 400 and subscriptions never activate.",
+      "action": "In server/app.ts or index.ts, register the webhook route BEFORE the global express.json() middleware. The webhook route must use express.raw({ type: 'application/json' }). Then inside the webhook handler use stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], process.env.STRIPE_WEBHOOK_SECRET) to verify. If signature is invalid, return 400 immediately. If valid, process the event. Test with: stripe.webhooks.generateTestHeaderString() in a unit test.",
+      "verify": "POST /api/payments/webhook with a valid Stripe test payload and correct signature returns 200. POST with wrong signature returns 400."
+    },
+    {
+      "id": 2,
+      "priority": "CRITICAL",
+      "title": "Fix Refresh Token Revocation on Logout",
+      "problem": "After logout, the refresh token is still valid and can be reused to get new access tokens. This is a security hole.",
+      "action": "On POST /api/auth/logout: hash the refresh token with SHA-256 and store that hash in Redis with key 'revoked:TOKEN_HASH' and TTL equal to the token's remaining expiry time. On POST /api/auth/refresh: before issuing new tokens, hash the incoming refresh token, check Redis for 'revoked:TOKEN_HASH'. If found, return 401 Unauthorized. If not found, rotate the token (delete old, issue new).",
+      "verify": "1. Login → get refresh token. 2. POST /auth/logout. 3. POST /auth/refresh with same token → must return 401."
+    },
+    {
+      "id": 3,
+      "priority": "CRITICAL",
+      "title": "Add Soft Deletes — Never Hard Delete Users",
+      "problem": "If a user is deleted from the database, all their payment history, audit logs, and invoices become orphaned or lost. GDPR requires 30-day recovery.",
+      "action": "Add column deleted_at TIMESTAMPTZ DEFAULT NULL to users table. Run migration. Replace ALL DELETE FROM users queries with UPDATE users SET deleted_at = NOW(). Add WHERE deleted_at IS NULL to ALL SELECT queries on users. Add GET /api/users/me/delete endpoint that sets deleted_at. Add admin endpoint to hard-delete after 30 days.",
+      "verify": "DELETE account → row still exists in DB with deleted_at set. GET /users/me returns 401 (user treated as non-existent). Row is NOT returned in admin user list."
+    },
+    {
+      "id": 4,
+      "priority": "HIGH",
+      "title": "Fix Rate Limiting to Survive Server Restart",
+      "problem": "Current rate limiting uses in-memory store. Every server restart resets all counters. An attacker can brute-force passwords by triggering restarts.",
+      "action": "Install 'rate-limit-redis' and 'ioredis' packages. Replace the MemoryStore in express-rate-limit with RedisStore. Use the existing Redis connection. Apply rate limit of 5 requests per 15 minutes specifically to POST /api/auth/login and POST /api/auth/register. Apply 20 requests per minute to all unauthenticated routes.",
+      "verify": "Make 6 POST /api/auth/login requests with wrong password → 6th returns HTTP 429 with message 'Too many login attempts'. Restart server → limit still applies (not reset)."
+    },
+    {
+      "id": 5,
+      "priority": "HIGH",
+      "title": "Add Zod Input Validation to ALL Auth DTOs",
+      "problem": "Currently raw req.body is used without validation. Attackers can send null, 10,000-character strings, or malicious payloads.",
+      "action": "Install 'zod'. Create schemas: RegisterSchema (email: z.string().email(), password: z.string().min(8).regex(/[A-Z]/).regex(/[0-9]/), name: z.string().min(1).max(100)). Create LoginSchema (email, password: z.string()). Apply to /auth/register and /auth/login. If validation fails return HTTP 400 with { field: 'email', message: 'Invalid email format' }. Apply similar validation to profile update and password change routes.",
+      "verify": "POST /auth/register with { email: 'notanemail', password: '123' } returns 400 with specific field errors. POST /auth/register with valid data returns 201."
+    },
+    {
+      "id": 6,
+      "priority": "HIGH",
+      "title": "Write Real Unit Tests — Edge Cases",
+      "problem": "The test suite only covers happy paths. Production apps break on edge cases.",
+      "action": "Create test files using Jest. Write and run these specific tests: (A) auth.service.test.ts — register with duplicate email throws 409, login with wrong password throws 401, login 6th attempt in 15min throws 429, refresh with revoked token throws 401. (B) dijkstra.test.ts — shortest path on 5-node graph returns correct path array, disconnected node returns Infinity distance, single-node graph returns empty path. (C) sorting.test.ts — for bubbleSort, mergeSort, quickSort: test with random array, reverse array, all-same array, empty array — result must equal [...input].sort((a,b)=>a-b). Run npm test and show results.",
+      "verify": "npm test runs with 0 failures. Output shows test count > 20."
+    },
+    {
+      "id": 7,
+      "priority": "HIGH",
+      "title": "Add Audit Log for All Sensitive Actions",
+      "problem": "No record of who did what. For B2B clients this is a compliance requirement (SOC2, GDPR).",
+      "action": "Create audit_logs table: id BIGSERIAL, user_id UUID, action VARCHAR(100), resource_type VARCHAR(100), ip_address TEXT, payload JSONB, created_at TIMESTAMPTZ DEFAULT NOW(). Create logAudit(userId, action, resourceType, ip, payload) helper function. Call it on: user.register, user.login, user.login_failed, user.logout, user.delete, password.change, plan.upgrade, plan.downgrade, admin.ban_user, admin.change_role. Add GET /api/admin/audit-logs endpoint (admin only) with pagination.",
+      "verify": "After login, SELECT * FROM audit_logs shows 1 row with action='user.login' and correct user_id and ip."
+    },
+    {
+      "id": 8,
+      "priority": "MEDIUM",
+      "title": "Add Docker Compose for Full Local Stack",
+      "problem": "Currently requires manual PostgreSQL and Redis setup. Freelance clients need to run this with one command.",
+      "action": "Create docker-compose.yml with 4 services: postgres (image: postgres:16-alpine, healthcheck: pg_isready, volume for persistence), redis (image: redis:7-alpine, maxmemory 128mb, allkeys-lru policy), api (builds from current project, depends_on postgres+redis healthy, environment variables from .env), nginx (image: nginx:alpine, proxies / to frontend, /api to backend). Create .env.example with all required variables. Create nginx/nginx.conf with upstream api and upstream frontend blocks. README: add 'docker compose up' as the start command.",
+      "verify": "docker compose up starts all 4 services with no errors. curl http://localhost/api/health returns {status: 'ok'}. curl http://localhost returns the login page."
+    }
+  ],
+  "final_steps": [
+    "After ALL 8 fixes are applied, run: npm test — must show 0 failures",
+    "Run: npm run build — must complete with 0 errors",
+    "Start the app and manually verify: login works, logout invalidates token, stripe webhook returns 200 with valid payload",
+    "Print a final summary: 'X tests passing, 0 failing. All 8 fixes verified.'"
+  ],
+  "rules": [
+    "Do NOT rewrite pages that already work visually",
+    "Do NOT change the UI design or existing routes",
+    "Do NOT use placeholder or TODO comments — implement fully",
+    "Do NOT stop after one fix — complete ALL 8 before marking done",
+    "If a package needs installing, install it and continue",
+    "If a migration is needed, write and run it immediately"
+  ]
+}

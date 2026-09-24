@@ -1,0 +1,641 @@
+
+MISSION
+
+Build a fully working, production-grade, white-label SaaS Boilerplate with:
+
+    Auth (JWT + OAuth)
+
+    Payments (Stripe)
+
+    Admin Dashboard with live graphs
+
+    Algorithm Visualizer (Dijkstra, Binary Search, ALL sorting algorithms)
+
+    Full unit & integration test suite (every edge case)
+
+    Fault-tolerant, Telegram-level architecture for 1M+ concurrent users
+
+This boilerplate will be reused for ALL future freelance projects.
+Build it like a production startup product, NOT a demo.
+TECH STACK
+Backend (NestJS / Node.js / TypeScript)
+
+    Framework: NestJS (TypeScript, modular architecture)
+
+    Database: PostgreSQL 16 (primary) + Redis 7 (cache + sessions + pub/sub)
+
+    ORM: TypeORM with auto-migrations
+
+    Auth: JWT (RS256) + Passport.js + Google OAuth2 + GitHub OAuth2
+
+    Payments: Stripe SDK (subscriptions + webhooks + metered billing)
+
+    Queue: BullMQ (Redis-backed) for async jobs (emails, webhooks, cron)
+
+    WebSockets: Socket.IO with Redis Adapter for horizontal scaling
+
+    Rate Limiting: Redis sliding window (100/1000/10000 req/min by plan)
+
+    Logging: Winston + Pino (structured JSON)
+
+    Health: @nestjs/terminus health endpoints
+
+    Docs: @nestjs/swagger at /api/docs
+
+Frontend (Angular 17+)
+
+    Framework: Angular 17 standalone components + Signals
+
+    UI: TailwindCSS with dark/light mode
+
+    Charts: Chart.js (line, bar, doughnut, area for dashboard KPIs)
+
+    Algorithm Visualizer: D3.js canvas-based animated renderer
+
+    State: Angular Signals store
+
+    Testing: Jest + Angular Testing Library
+
+Infrastructure
+
+    Docker + Docker Compose (4 API replicas for horizontal scaling)
+
+    Nginx (load balancer: least_conn algorithm + gzip + security headers)
+
+    CI/CD: GitHub Actions (lint > test > build > deploy)
+
+ARCHITECTURE — TELEGRAM-LEVEL FAULT TOLERANCE
+1. WORM / Append-Only Data (Like Telegram MTProto Storage)
+
+    Users: NEVER hard delete. Use deleted_at soft deletes.
+
+    Payment events: APPEND-ONLY immutable transaction log.
+
+    Audit log: append-only event stream (userId, action, payload, timestamp).
+
+    All critical state changes create a NEW record. Old records are never mutated.
+
+2. Circuit Breaker Pattern (using 'opossum' library)
+
+    Stripe API: circuit breaker with 3-failure threshold, 30s timeout
+
+    Email service: fallback to queue with exponential backoff retry
+
+    OAuth providers: graceful degradation (allow password login if OAuth is down)
+
+3. Horizontal Scaling (Stateless)
+
+    Zero in-memory state: all state in Redis or PostgreSQL
+
+    Redis Pub/Sub for WebSocket events across multiple server instances
+
+    BullMQ distributed queues (multiple workers process same queue)
+
+    PostgreSQL connection pooling (max 20 connections per instance)
+
+    Nginx upstream with least_conn load balancing
+
+4. Dijkstra Applied to Internal Service Routing
+
+    Service registry where each external service (email, payments, CDN) has a weight
+
+    Weight = latency + error_rate (updated every 30 seconds)
+
+    Route to lowest-weight endpoint using Dijkstra shortest path
+
+    Re-weight nodes based on health metrics automatically
+
+5. Read Replicas + Sharding
+
+    Write to PostgreSQL primary, read from replica
+
+    Shard users by user_id % num_shards for scale
+
+    Dashboard queries hit read replica only
+
+MODULE 1: AUTH
+
+Files: src/auth/
+
+    auth.module.ts, auth.controller.ts, auth.service.ts
+
+    strategies/: jwt.strategy.ts (RS256, 15min), jwt-refresh.strategy.ts (7days, Redis-backed), google.strategy.ts, github.strategy.ts
+
+    guards/: jwt-auth.guard.ts, roles.guard.ts, throttle.guard.ts
+
+    dto/: register.dto.ts, login.dto.ts, refresh-token.dto.ts
+
+    entities/: user.entity.ts, session.entity.ts, oauth-provider.entity.ts
+
+Features:
+
+    Register (email + bcrypt 12 rounds)
+
+    Login (returns access_token + refresh_token)
+
+    Refresh token rotation (Redis blacklist for revoked tokens)
+
+    Google OAuth2 + GitHub OAuth2
+
+    Email verification (BullMQ queue, 24h expiry)
+
+    Password reset (secure token, 1-hour expiry, single-use)
+
+    TOTP 2FA (speakeasy, QR code generation)
+
+    Rate limiting: 5 login attempts per 15min per IP
+
+    RBAC roles: SUPER_ADMIN, ADMIN, USER via @Roles() decorator
+
+    Audit log entry for every auth event
+
+MODULE 2: USERS
+
+Files: src/users/
+
+Features:
+
+    GET /users/me — profile without sensitive fields
+
+    PATCH /users/me — update allowed fields
+
+    POST /users/change-password — validates old password first
+
+    POST /users/avatar — Multer upload
+
+    DELETE /users/me — soft delete (GDPR, 30-day recovery)
+
+    Admin: paginated user list + search + filter by plan/role
+
+    Admin: ban/unban + change role
+
+MODULE 3: PAYMENTS (STRIPE)
+
+Files: src/payments/
+
+Features:
+
+    Plans: FREE | PRO ($29/mo) | ENTERPRISE ($99/mo)
+
+    Create Stripe Customer on registration
+
+    POST /payments/checkout → Stripe-hosted Checkout Session
+
+    POST /payments/webhook (raw body, stripe-signature verified):
+
+        customer.subscription.created → update user plan
+
+        customer.subscription.updated → sync plan
+
+        customer.subscription.deleted → downgrade to FREE
+
+        invoice.payment_succeeded → record payment event
+
+        invoice.payment_failed → send email + 3-day grace period
+
+    GET /payments/portal → Stripe Customer Portal redirect
+
+    GET /payments/invoices → paginated invoice history
+
+    Usage-based metering: count API calls, bill monthly
+
+    Circuit breaker: if Stripe down, queue payment + show "processing"
+
+    All payment events stored in append-only payment_events table
+
+MODULE 4: DASHBOARD
+
+Backend: src/dashboard/
+
+    GET /dashboard/kpis → {totalUsers, mrr, dau, apiCalls, churnRate, arpu}
+
+    GET /dashboard/analytics → revenue time series (30 days)
+
+    GET /dashboard/signups → daily signups (7 days)
+
+    GET /dashboard/plans → plan distribution data
+
+    WebSocket gateway: push live user count every 10s
+
+Frontend: src/app/dashboard/
+KPI Cards (6 metrics, live via WebSocket, 30s refresh):
+
+    Total Users (with % change)
+
+    MRR (Monthly Recurring Revenue)
+
+    Daily Active Users
+
+    API Calls This Month (with usage bar)
+
+    Churn Rate
+
+    ARPU
+
+Charts (Chart.js):
+
+    Revenue trend: 30-day line chart
+
+    New signups: 7-day bar chart
+
+    Plan distribution: doughnut chart (FREE/PRO/ENTERPRISE)
+
+    Real-time active users: live counter via WebSocket
+
+    Error rate: 24-hour line chart
+
+    API latency P50/P95/P99: multi-line chart
+
+Data Table: sortable, filterable, paginated users table
+Activity Feed: real-time event stream via WebSocket
+MODULE 5: ALGORITHM VISUALIZER (All Algorithms, Animated)
+
+Build with D3.js or Canvas API. All animations must be smooth with speed control.
+1. DIJKSTRA'S ALGORITHM
+
+    Interactive graph editor: click to add nodes, drag to connect edges, set weights
+
+    Animation steps:
+
+        Unvisited nodes = gray
+
+        Current node being processed = blue
+
+        Visited nodes = green
+
+        Shortest path found = gold highlight
+
+        Edge traversal animated with cumulative distance numbers
+
+    Priority queue state shown at each step
+
+    Distance table updates in real-time alongside graph
+
+    Speed slider: 0.5x to 5x
+
+    Random graph generator button
+
+    Reset button
+
+2. BINARY SEARCH
+
+    Array rendered as colored boxes with index labels
+
+    Left pointer (blue arrow), Right pointer (red arrow), Mid pointer (yellow arrow)
+
+    Animated step with comparison shown: "arr[mid]=42 > target=37, search left"
+
+    Found element highlights green, not-found highlights red
+
+    O(log n) step counter shown
+
+    Custom array input + target value input
+
+3. SORTING ALGORITHMS (ALL 8 — every one animated)
+
+Algorithms: Bubble Sort, Selection Sort, Insertion Sort, Merge Sort, Quick Sort, Heap Sort, Radix Sort, Tim Sort
+Each visualizer includes:
+
+    Colored vertical bars (height = value)
+
+    Comparing bars = orange, swapping bars = red, sorted position = green
+
+    Comparisons counter + swaps counter
+
+    Time complexity badge (e.g., O(n log n))
+
+    Space complexity badge
+
+    Speed control slider (0.5x to 10x)
+
+    Array size slider (10 to 200 elements)
+
+    Array type buttons: Random | Nearly Sorted | Reverse Sorted | All Equal
+
+4. BINARY SEARCH TREE (BST)
+
+    Insert, delete, search with smooth animations
+
+    In-order, pre-order, post-order traversal with node highlighting
+
+5. A* PATHFINDING (Grid)
+
+    Grid editor: click to add walls, set start and end
+
+    Shows heuristic cost (h), path cost (g), total (f) per node
+
+    Open set (orange) vs closed set (gray) vs path (green)
+
+    Compare A* vs Dijkstra side by side
+
+6. BFS / DFS GRAPH TRAVERSAL
+
+    Same interactive graph as Dijkstra
+
+    Side-by-side BFS vs DFS comparison
+
+    Queue/Stack state shown at each step
+
+7. DYNAMIC PROGRAMMING VISUALIZERS
+
+    Knapsack: show weight/value table filling
+
+    Longest Common Subsequence: show DP grid filling with colored cells
+
+DATABASE SCHEMA (PostgreSQL + TypeORM Entities)
+
+Tables to create via TypeORM migrations:
+
+    users: id(UUID), email, password_hash, role, plan, email_verified, two_factor_enabled, two_factor_secret, stripe_customer_id, avatar_url, created_at, updated_at, deleted_at
+
+    sessions: id(UUID), user_id(FK), refresh_token_hash, ip_address, user_agent, expires_at, revoked_at, created_at
+
+    oauth_providers: id(UUID), user_id(FK), provider, provider_user_id, UNIQUE(provider, provider_user_id)
+
+    subscriptions: id(UUID), user_id(FK), stripe_subscription_id(UNIQUE), stripe_price_id, status, plan, current_period_start, current_period_end, cancel_at
+
+    payment_events: id(UUID), user_id(FK), stripe_event_id(UNIQUE), event_type, amount_cents, currency, status, metadata(JSONB) — APPEND ONLY
+
+    audit_logs: id(BIGSERIAL), user_id(FK), action, resource_type, resource_id, ip_address, payload(JSONB) — APPEND ONLY
+
+    api_usage: id(BIGSERIAL), user_id(FK), endpoint, method, status_code, duration_ms, created_at
+
+Required indexes for 1M+ user performance:
+
+    idx_users_email (unique)
+
+    idx_users_stripe
+
+    idx_sessions_user_id, idx_sessions_expires
+
+    idx_audit_logs_user_id, idx_audit_logs_created DESC
+
+    idx_api_usage_user_date (user_id, created_at DESC)
+
+FULL TEST SUITE (Must All Pass Before Done)
+Backend Unit Tests (Jest)
+
+auth.service.spec.ts:
+
+    register() happy path → creates user, returns JWT pair
+
+    register() duplicate email → throws ConflictException
+
+    register() weak password → throws BadRequestException
+
+    login() valid credentials → returns access + refresh tokens
+
+    login() wrong password → throws UnauthorizedException
+
+    login() 6th attempt in 15min → throws TooManyRequestsException (rate limit)
+
+    refreshToken() valid → rotates token pair
+
+    refreshToken() revoked token → throws UnauthorizedException
+
+    refreshToken() expired → throws UnauthorizedException
+
+    resetPassword() → sends queued email, saves hashed token
+
+    verifyEmail() valid token → marks email verified
+
+    2FA enable/disable/verify all paths
+
+users.service.spec.ts:
+
+    getProfile() → returns user without password_hash, two_factor_secret
+
+    updateProfile() → only updates allowed fields
+
+    deleteAccount() → sets deleted_at, does NOT remove row from DB
+
+    changePassword() → validates old password before hashing new
+
+payments.service.spec.ts:
+
+    createCheckoutSession() → calls Stripe, returns session URL
+
+    handleWebhook() subscription.created → updates user.plan
+
+    handleWebhook() invoice.payment_failed → queues email + sets grace period
+
+    handleWebhook() invalid signature → throws BadRequestException
+
+    circuit breaker → after 3 Stripe failures, next call fails fast (open circuit)
+
+Algorithm unit tests:
+dijkstra.spec.ts:
+
+    returns correct shortest path on known 5-node graph
+
+    handles disconnected graph (unreachable node = Infinity)
+
+    handles single-node graph
+
+    handles zero-weight edges
+
+    returns path array in correct order
+
+binary-search.spec.ts:
+
+    finds element at index 0
+
+    finds element at last index
+
+    finds element at middle
+
+    returns -1 for not-found value
+
+    returns -1 for empty array
+
+    handles single-element array (found)
+
+    handles single-element array (not found)
+
+sorting.spec.ts (ALL 8 algorithms × 7 test cases = 56 tests):
+For each of: bubbleSort, selectionSort, insertionSort, mergeSort, quickSort, heapSort, radixSort, timSort
+
+    Sorts random array correctly
+
+    Sorts already-sorted array (no change)
+
+    Sorts reverse-sorted array
+
+    Sorts array with duplicates
+
+    Sorts array with all identical values
+
+    Handles single-element array
+
+    Handles empty array
+
+Backend Integration Tests (Supertest against test DB)
+
+auth.e2e.spec.ts:
+
+    POST /auth/register → 201 + token pair
+
+    POST /auth/login → 200 + token pair
+
+    GET /users/me with Bearer token → 200 + profile
+
+    GET /users/me without token → 401
+
+    GET /users/me with expired token → 401
+
+    POST /auth/refresh valid → 200 + new tokens
+
+    POST /auth/refresh after POST /auth/logout → 401 (revoked)
+
+payments.e2e.spec.ts:
+
+    POST /payments/checkout (authenticated PRO upgrade) → 201 + Stripe URL
+
+    POST /payments/webhook (mock subscription.created) → user.plan updated to PRO
+
+    POST /payments/webhook (invalid signature) → 400
+
+rate-limit.e2e.spec.ts:
+
+    5 failed logins → 6th returns 429 TooManyRequests
+
+    Rate limit resets after 15 min window
+
+dashboard.e2e.spec.ts:
+
+    GET /dashboard/kpis → 200 + {totalUsers, mrr, dau, apiCalls, churnRate, arpu}
+
+    WebSocket: connect, receive live_users_count event within 15s
+
+Frontend Tests (Jest + Angular Testing Library)
+
+    LoginComponent: validation errors shown on invalid submit
+
+    LoginComponent: success → navigates to /dashboard
+
+    LoginComponent: 401 error → shows "Invalid credentials" message
+
+    DashboardComponent: renders 6 KPI cards with mock data
+
+    DashboardComponent: shows skeleton loaders while fetching
+
+    AlgorithmVisualizerComponent: renders without errors, start button works
+
+    JwtInterceptor: attaches Authorization: Bearer header to requests
+
+    JwtInterceptor: on 401 response → calls refresh, retries original request
+
+    AuthGuard: unauthenticated user redirected to /login
+
+    AuthGuard: authenticated user can access /dashboard
+
+Test Commands
+
+npm run test # all unit tests
+npm run test:e2e # integration tests (requires docker-compose.test.yml up)
+npm run test:cov # coverage report (target: ≥80% backend, ≥70% frontend)
+npm run test:watch # watch mode
+QoS / PERFORMANCE TARGETS
+
+Metric | Target
+API P50 response time | < 50ms
+API P95 response time | < 200ms
+API P99 response time | < 500ms
+Database query (cached) | < 10ms
+Database query (uncached) | < 50ms
+WebSocket event delivery | < 100ms
+Auth token verify | < 5ms
+Max concurrent users | 1,000,000
+Throughput | 50,000 req/sec
+Uptime SLA | 99.9%
+SECURITY REQUIREMENTS
+
+    Passwords: bcrypt, 12 rounds minimum
+
+    JWT: RS256 asymmetric signing (private key server-only)
+
+    Refresh tokens: SHA-256 hashed before DB storage
+
+    HTTPS: redirect HTTP to HTTPS in Nginx
+
+    CORS: specific allowed origins only
+
+    Helmet.js: HSTS, CSP, X-Frame-Options, X-Content-Type headers
+
+    No SQL injection: TypeORM parameterized queries only
+
+    XSS: Angular DomSanitizer + Content-Security-Policy
+
+    Stripe webhooks: raw body + stripe-signature verified
+
+    Rate limiting: all auth endpoints protected
+
+    Input validation: class-validator on all DTOs
+
+    GDPR: user data export + soft delete endpoint
+
+DOCKER & NGINX
+
+docker-compose.yml services:
+
+    postgres (16-alpine, healthcheck, persistent volume)
+
+    redis (7-alpine, maxmemory 256mb, allkeys-lru, password protected)
+
+    api (4 replicas, depends on postgres+redis being healthy)
+
+    frontend (Angular built app)
+
+    nginx (least_conn upstream, gzip, security headers, rate limiting)
+
+Environment variables (validate all with Joi on startup):
+DATABASE_URL, REDIS_URL, JWT_PRIVATE_KEY, JWT_PUBLIC_KEY,
+STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
+GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
+GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET,
+SMTP_HOST, SMTP_USER, SMTP_PASS, FRONTEND_URL
+SEED DATA
+
+On first run, seed script creates:
+
+    Admin user: admin@saas.dev / Admin1234! (role: SUPER_ADMIN)
+
+    Free user: user_free@test.dev / Test1234! (plan: FREE)
+
+    Pro user: user_pro@test.dev / Test1234! (plan: PRO, mock Stripe customer)
+
+    Enterprise user: user_ent@test.dev / Test1234! (plan: ENTERPRISE)
+
+FINAL AGENT INSTRUCTIONS
+
+    Scaffold the COMPLETE monorepo structure above
+
+    Implement ALL modules — NO placeholder TODOs, NO stub functions
+
+    Write ALL unit tests listed and make them PASS
+
+    Write ALL integration tests and make them PASS against test DB + Redis
+
+    Run npm run test:cov — confirm ≥ 80% backend coverage, ≥ 70% frontend
+
+    docker compose up — must boot ALL services with zero errors
+
+    /api/docs — Swagger UI must be accessible and show all endpoints
+
+    Run seed script — all 4 test users must be created
+
+    Run full test suite ONE MORE TIME after everything is complete
+
+    Output final summary: "X tests passed, 0 failed, coverage: Y%"
+
+DO NOT stop or mark as complete until:
+
+    All tests are GREEN
+
+    docker compose up works
+
+    Swagger docs accessible
+
+    Seed data created
+
+    Final test run shows 0 failures
